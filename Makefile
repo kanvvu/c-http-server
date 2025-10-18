@@ -1,8 +1,13 @@
-main: main.c
+main: main.c client
 	gcc -o main main.c
 
-run:
+client: client.c
+	gcc -o client client.c
+
+runs:
 	./main
+runc:
+	./client
 
 clean: 
-	rm -f *.o main
+	rm -f *.o main client

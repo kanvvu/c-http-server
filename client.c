@@ -10,11 +10,10 @@
 
 
 #define MYPORT "6969"
-#define BACKLOG 10
 
 int main() {
 	int status;
-	struct sockaddr_storage their_addr;
+	struct sockaddr_storage server_addr;
 	socklen_t addr_size;
 	struct addrinfo hints;
 	struct addrinfo *servinfo, *p;
@@ -24,7 +23,6 @@ int main() {
 	memset(&hints, 0, sizeof hints);
 	hints.ai_family = AF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM;
-	hints.ai_flags = AI_PASSIVE;
 	
 	if ((status = getaddrinfo(NULL, MYPORT, &hints, &servinfo)) != 0) {
 		fprintf(stderr, "gai error: %s \n", gai_strerror(status));
@@ -56,51 +54,34 @@ int main() {
 		exit(1);
 	}
 
-	if (bind(s, p->ai_addr, p->ai_addrlen) == -1) {
-		perror("Bind");
-		exit(1);
-	} 
 
-	//getting rid of Address already in use error
-	int yes = 1;
-	if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof yes) == -1) {
-		perror("setsockopt");
-		exit(1);
-	}
+    if (connect(s, p->ai_addr, p->ai_addrlen) == -1) {
+        perror("connect");
+        exit(1);
+    }
+    printf("\tConnected to server!\n");
 
 	freeaddrinfo(servinfo);
 
-	if (listen(s, BACKLOG) == -1) {
-		perror("listen");
-		exit(1);
-	}
+    char buff[64];
+    int bytes_recived;
+    
+    bytes_recived = recv(s, buff, sizeof buff, 0);
+    if (bytes_recived == -1) {
+        perror("recv");
+        exit(1);
+    }
+    if (bytes_recived == 0) {
+        printf("Server is closed!\n");
+        exit(1);
+    }
 
-	printf("\tListening for connection...\n");
-
-	addr_size = sizeof their_addr;
-	int new_fd = accept(s,(struct sockaddr *) &their_addr, &addr_size);
-	if (new_fd == -1) {
-		perror("accept");
-		exit(1);
-	}
-
-	printf("\tAccepted new connection!\n");
-
-	char *msg = "Hello World!\n";
-	int len, bytes_sent;
-	len = strlen(msg);
-
-	bytes_sent = send(new_fd, msg, len, 0);
-	if (bytes_sent == -1) {
-		perror("send");
-		exit(1);
-	}
-	printf("\tBytes to sent: %d, Bytes sent: %d\n", len, bytes_sent);
-
+    printf("\tBytes recived %d\n", bytes_recived);
+    buff[strcspn(buff, "\n")] = '\0';
+    printf("MSG: %s\n", buff);
 
 	close(s);
-	close(new_fd);
 
-	printf("\tServer closed\n");
+	printf("\tClient closed\n");
 	return 0;
 }
