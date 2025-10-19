@@ -12,6 +12,9 @@
 #define MYPORT "6969"
 #define BACKLOG 10
 
+int sent_greeting(int fd);
+int sent_msg(int fd, char * msg);
+
 int main() {
 	int status;
 	struct sockaddr_storage their_addr;
@@ -77,30 +80,62 @@ int main() {
 
 	printf("\tListening for connection...\n");
 
-	addr_size = sizeof their_addr;
-	int new_fd = accept(s,(struct sockaddr *) &their_addr, &addr_size);
-	if (new_fd == -1) {
-		perror("accept");
-		exit(1);
+	while(1) {
+		addr_size = sizeof their_addr;
+		int new_fd = accept(s,(struct sockaddr *) &their_addr, &addr_size);
+		if (new_fd == -1) {
+			perror("accept");
+			exit(1);
+		}
+
+		if (sent_greeting(new_fd) == -1) exit(1);
+		
+		if (fork() == 0) {
+			printf("\tAccepted new connection!\n");
+
+			while(1) {
+				char buff[64];
+				int bytes_recived;
+
+				bytes_recived = recv(new_fd, buff, sizeof buff, 0);
+
+				if (bytes_recived == -1) {
+					perror("recv");
+					exit(1);
+				}
+				if (bytes_recived == 0) exit(1);
+
+				printf("\tBytes recived: %d, %ld\n", bytes_recived, strlen(buff));
+				buff[strcspn(buff, "\n")] = '\0';
+				printf("MSG: %s\n", buff);
+
+				sent_msg(new_fd, "Hello World!\n");
+			}
+
+			return 0;
+		}
 	}
-
-	printf("\tAccepted new connection!\n");
-
-	char *msg = "Hello World!\n";
-	int len, bytes_sent;
-	len = strlen(msg);
-
-	bytes_sent = send(new_fd, msg, len, 0);
-	if (bytes_sent == -1) {
-		perror("send");
-		exit(1);
-	}
-	printf("\tBytes to sent: %d, Bytes sent: %d\n", len, bytes_sent);
 
 
 	close(s);
-	close(new_fd);
 
 	printf("\tServer closed\n");
 	return 0;
+}
+
+int sent_greeting(int fd) {
+	sent_msg(fd, "Hi, i hope we will have meaningful conversation!\n");
+}
+
+int sent_msg(int fd, char * msg) {
+	int len, bytes_sent;
+	len = strlen(msg);
+
+	bytes_sent = send(fd, msg, len, 0);
+	if (bytes_sent == -1) {
+		perror("send");
+		return -1;
+	}
+
+	printf("\tBytes to sent: %d, Bytes sent: %d\n", len, bytes_sent);
 }

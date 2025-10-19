@@ -3,3 +3,6 @@ client
 .vscode
 *.o
 todo.txt
+fork_test.c
+fork_test
+ft
