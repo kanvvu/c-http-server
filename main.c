@@ -126,16 +126,3 @@ int main() {
 int sent_greeting(int fd) {
 	sent_msg(fd, "Hi, i hope we will have meaningful conversation!\n");
 }
-
-int sent_msg(int fd, char * msg) {
-	int len, bytes_sent;
-	len = strlen(msg);
-
-	bytes_sent = send(fd, msg, len, 0);
-	if (bytes_sent == -1) {
-		perror("send");
-		return -1;
-	}
-
-	printf("\tBytes to sent: %d, Bytes sent: %d\n", len, bytes_sent);
-}
