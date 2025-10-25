@@ -7,9 +7,8 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <unistd.h>
+#include "utils.h"
 
-int recv_msg(int fd);
-int sent_msg(int fd, char * msg);
 
 #define MYPORT "6969"
 

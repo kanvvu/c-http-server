@@ -37,3 +37,7 @@ int recv_msg(int fd) {
 
 	return 0;
 }
+
+int sent_greeting(int fd) {
+	sent_msg(fd, "Hello! I hope we will have meaningful conversation!");
+}

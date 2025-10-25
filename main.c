@@ -7,13 +7,22 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <unistd.h>
+#include <signal.h>
+#include <sys/wait.h>
+#include <errno.h>
+#include "utils.h"
 
 
 #define MYPORT "6969"
 #define BACKLOG 10
 
-int sent_greeting(int fd);
-int sent_msg(int fd, char * msg);
+void sigchild_handler(int s) {
+	int saved_errno = errno;
+
+	while(waitpid(-1, NULL, WNOHANG) > 0);
+
+	errno = saved_errno;
+}
 
 int main() {
 	int status;
@@ -73,6 +82,16 @@ int main() {
 
 	freeaddrinfo(servinfo);
 
+	struct sigaction sa;
+	sa.sa_handler = sigchild_handler;
+	sigemptyset(&sa.sa_mask);
+	sa.sa_flags = SA_RESTART;
+	if (sigaction(SIGCHLD, &sa, NULL) == -1) {
+		perror("sigaction");
+		exit(1);
+	}
+
+
 	if (listen(s, BACKLOG) == -1) {
 		perror("listen");
 		exit(1);
@@ -121,8 +140,4 @@ int main() {
 
 	printf("\tServer closed\n");
 	return 0;
-}
-
-int sent_greeting(int fd) {
-	sent_msg(fd, "Hi, i hope we will have meaningful conversation!\n");
 }
