@@ -7,7 +7,6 @@ client: client.c utils.o
 	gcc -o bin/client client.c utils.o
 
 fork_test: fork_test.c
-	gcc -o ft fork_test.c
 
 %.o: %.c
 	gcc -c $< -o $@
@@ -17,8 +16,8 @@ run:
 runc:
 	./bin/client
 
-runf:
-	./ft
+runt: temp.c
+	gcc -o bin/temp temp.c && ./bin/temp
 
 clean: 
-	rm -f *.o main client ft bin/*
+	rm -f *.o bin/*
