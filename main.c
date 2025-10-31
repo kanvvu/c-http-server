@@ -16,6 +16,9 @@ int main() {
 		exit(1);
 	}
 
+	pfds[0].fd = listener;
+	pfds[0].events = POLLIN;
+
 	fd_count = 1;
 
 	puts("pollsever: waiting for connections... ");
