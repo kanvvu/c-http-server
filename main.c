@@ -25,6 +25,7 @@ int main() {
 
 	for(;;) {
 		int poll_count = poll(pfds, fd_count, -1);
+		printf("polled: %d\n", poll_count);
 
 		if (poll_count == -1) {
 			perror("poll");

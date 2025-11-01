@@ -152,15 +152,28 @@ void handle_new_connection(int listener, int *fd_count, int *fd_size, struct pol
 		add_to_pfds(pfds, newfd, fd_count, fd_size);
 
 		printf("pollserver: new connection from %s on socket %d\n", inet_ntop2(&remoteaddr, remoteIP, sizeof remoteIP), newfd);
+
+
+		//lets greet our client!
+		char msg[128];
+		snprintf(msg, sizeof msg, "\nWelcome traveler! I hope you will have fun!\r\nFrom now you will be known as user%d! What interesting you have to say?\r\n\n", newfd);
+		if (send(newfd, msg, strlen(msg), 0) == -1) {
+			perror("send");
+		}
+
 	}
 }
 
 void handle_client_data(int listener, int *fd_count, struct pollfd *pfds, int *pfd_i) {
+	//even though fresh in each call still can have junk from other calls
 	char buf[256];
 
-	int nbytes = recv(pfds[*pfd_i].fd, buf, sizeof buf, 0);
-
+	//the one who is recived data is the one who sent it
 	int sender_fd = pfds[*pfd_i].fd;
+
+	int nbytes = recv(sender_fd, buf, sizeof buf, 0);
+	buf[nbytes] = '\0';
+
 
 	if (nbytes <=0 ) {
 		if (nbytes == 0) {
@@ -179,9 +192,15 @@ void handle_client_data(int listener, int *fd_count, struct pollfd *pfds, int *p
 			int dest_fd = pfds[j].fd;
 
 			if (dest_fd != listener && dest_fd != sender_fd) {
-				if (send(dest_fd, buf, nbytes, 0) == -1) {
+				char* nickname = "user";
+				char temp[300];
+
+				snprintf(temp, sizeof temp, "%s%d: %s", nickname, sender_fd, buf);
+
+				if (send(dest_fd, temp, strlen(temp), 0) == -1) {
 					perror("send");
 				}
+
 			}
 		}
 	}
