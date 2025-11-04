@@ -164,6 +164,7 @@ void handle_new_connection(int listener, int *fd_count, int *fd_size, struct pol
 	}
 }
 
+
 void handle_client_data(int listener, int *fd_count, struct pollfd *pfds, int *pfd_i) {
 	//even though fresh in each call still can have junk from other calls
 	char buf[256];
@@ -214,6 +215,95 @@ void process_connections(int listener, int *fd_count, int *fd_size, struct pollf
 				handle_new_connection(listener, fd_count, fd_size, pfds);
 			} else {
 				handle_client_data(listener, fd_count, *pfds, &i);
+			}
+		}
+	}
+}
+
+void handle_new_connection2(int listener, int *fd_count, int *fd_size, struct pollfd **pfds) {
+	struct sockaddr_storage remoteaddr;
+	socklen_t addrlen;
+	int newfd;
+	char remoteIP[INET6_ADDRSTRLEN];
+
+	addrlen = sizeof remoteaddr;
+	newfd = accept(listener, (struct sockaddr *)&remoteaddr, &addrlen);
+
+	if (newfd == -1) {
+		perror("accept");
+	} else {
+		add_to_pfds(pfds, newfd, fd_count, fd_size);
+
+		printf("pollserver: new connection from %s on socket %d\n", inet_ntop2(&remoteaddr, remoteIP, sizeof remoteIP), newfd);
+	}
+}
+
+void handle_client_data2(int listener, int *fd_count, struct pollfd *pfds, int *pfd_i) {
+	//even though fresh in each call still can have junk from other calls
+	char buf[1024]; //64, 128, 256, 512, 1024
+
+	//the one who is recived data is the one who sent it
+	int sender_fd = pfds[*pfd_i].fd;
+
+	int nbytes = recv(sender_fd, buf, sizeof buf, 0);
+	buf[nbytes] = '\0';
+
+
+	if (nbytes <=0 ) {
+		if (nbytes == 0) {
+			printf("pollserver: socket %d hung up\n", sender_fd);
+		} else {
+			perror("recv");
+		}
+
+		close(pfds[*pfd_i].fd);
+		del_from_pfds(pfds, *pfd_i, fd_count);
+		(*pfd_i)--;
+	} else {
+		printf("pollsever: recv from fd %d: %.*s", sender_fd, nbytes, buf);
+// 		char * response = "HTTP/1.1 200 OK\n\
+// Server: MyCustomServer/1.0 (Linux)\n\
+// Content-Type: text/html; charset=UTF-8\n\
+// Content-Length: 350\n\
+// Connection: keep-alive\n\
+// <!DOCTYPE html>\n\
+// <html lang=\"en\">\n\
+// <head>\n\
+// 	<meta charset=\"UTF-8\">\n\
+// 	<title>Welcome Home</title>\n\
+// </head>\n\
+// <body>\n\
+// 	<h1>Success!</h1>\n\
+// 	<p>This is the main page served from localhost:6969.</p>\n\
+// 	<p>Your browser is running: Chrome/142 on Windows.</p>\n\
+// </body>\n\
+// </html>";
+
+		char response[1024];
+		char *response_body = "<html><body>Hello, world!</body></html>";
+		snprintf(response, sizeof response,
+		"HTTP/1.1 200 OK\r\n"
+		"Content-Type: text/html\r\n"
+		"Content-Length: %zu\r\n"
+		"Connection: close\r\n"
+		"\r\n"
+		"%s", strlen(response_body), response_body);
+		if (send(sender_fd, response, strlen(response), 0) == -1) {
+			perror("send");
+		}
+		printf("response strlen: %ld\n", strlen(response));
+
+	}
+}
+
+void process_connections2(int listener, int *fd_count, int *fd_size, struct pollfd **pfds) {
+	for(int i=0; i<*fd_count; i++) {
+		if ((*pfds)[i].revents & (POLLIN | POLLHUP)) {
+
+			if ((*pfds)[i].fd == listener) {
+				handle_new_connection2(listener, fd_count, fd_size, pfds);
+			} else {
+				handle_client_data2(listener, fd_count, *pfds, &i);
 			}
 		}
 	}

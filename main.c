@@ -32,7 +32,7 @@ int main() {
 			exit(1);
 		}
 
-		process_connections(listener, &fd_count, &fd_size, &pfds);
+		process_connections2(listener, &fd_count, &fd_size, &pfds);
 	}
 
 	free(pfds);
