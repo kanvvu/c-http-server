@@ -261,26 +261,23 @@ void handle_client_data2(int listener, int *fd_count, struct pollfd *pfds, int *
 		(*pfd_i)--;
 	} else {
 		printf("pollsever: recv from fd %d: %.*s", sender_fd, nbytes, buf);
-// 		char * response = "HTTP/1.1 200 OK\n\
-// Server: MyCustomServer/1.0 (Linux)\n\
-// Content-Type: text/html; charset=UTF-8\n\
-// Content-Length: 350\n\
-// Connection: keep-alive\n\
-// <!DOCTYPE html>\n\
-// <html lang=\"en\">\n\
-// <head>\n\
-// 	<meta charset=\"UTF-8\">\n\
-// 	<title>Welcome Home</title>\n\
-// </head>\n\
-// <body>\n\
-// 	<h1>Success!</h1>\n\
-// 	<p>This is the main page served from localhost:6969.</p>\n\
-// 	<p>Your browser is running: Chrome/142 on Windows.</p>\n\
-// </body>\n\
-// </html>";
 
-		char response[1024];
-		char *response_body = "<html><body>Hello, world!</body></html>";
+		char response[2048];
+		FILE *fileptr;
+		fileptr = fopen("htmls/error.html", "r");
+		char response_body[1024];
+		if (fileptr == NULL) {
+			snprintf(response_body, sizeof response_body, "<html><body>Hello, world!</body></html>");
+		} else {
+			int index = 0;
+			char ch;
+			while((ch = fgetc(fileptr)) != EOF) {
+				response_body[index++] = ch;
+			}
+			response_body[index] = '\0';
+
+			fclose(fileptr);
+		}
 		snprintf(response, sizeof response,
 		"HTTP/1.1 200 OK\r\n"
 		"Content-Type: text/html\r\n"
