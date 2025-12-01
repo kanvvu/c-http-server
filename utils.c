@@ -8,6 +8,7 @@
 #include <string.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <dirent.h>
 
 #define PORT "9034"
 
@@ -263,21 +264,25 @@ void handle_client_data2(int listener, int *fd_count, struct pollfd *pfds, int *
 		printf("pollsever: recv from fd %d: %.*s", sender_fd, nbytes, buf);
 
 		char response[2048];
-		FILE *fileptr;
-		fileptr = fopen("htmls/error.html", "r");
+		response[0] = '\0';
 		char response_body[1024];
-		if (fileptr == NULL) {
-			snprintf(response_body, sizeof response_body, "<html><body>Hello, world!</body></html>");
-		} else {
-			int index = 0;
-			char ch;
-			while((ch = fgetc(fileptr)) != EOF) {
-				response_body[index++] = ch;
+		response_body[0] = '\0';
+		char* last = response_body; 
+		DIR *dr;
+		struct dirent *en;
+		dr = opendir(".");
+		last = stpcpy(last, "<ul>");
+		if (dr) {
+			while((en = readdir(dr)) != NULL) {
+				if (en->d_type == DT_REG) {
+					char line[600];
+					snprintf(line, sizeof line, "<li><a href=\"%s\" download>%s</a></li>", en->d_name, en->d_name);
+					last = stpcpy(last, line);
+				}
 			}
-			response_body[index] = '\0';
-
-			fclose(fileptr);
+			closedir(dr);
 		}
+		last = strcpy(last, "</ul>");
 		snprintf(response, sizeof response,
 		"HTTP/1.1 200 OK\r\n"
 		"Content-Type: text/html\r\n"
