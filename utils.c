@@ -265,31 +265,84 @@ void handle_client_data2(int listener, int *fd_count, struct pollfd *pfds, int *
 
 		char response[2048];
 		response[0] = '\0';
+		char response_code[128];
+		response_code[0] = '\0';
 		char response_body[1024];
 		response_body[0] = '\0';
-		char* last = response_body; 
-		DIR *dr;
-		struct dirent *en;
-		dr = opendir(".");
-		last = stpcpy(last, "<ul>");
-		if (dr) {
-			while((en = readdir(dr)) != NULL) {
-				if (en->d_type == DT_REG) {
-					char line[600];
-					snprintf(line, sizeof line, "<li><a href=\"%s\" download>%s</a></li>", en->d_name, en->d_name);
-					last = stpcpy(last, line);
+
+		/*
+		1. Get first line of request
+		*/
+		char *first_space = strchr(buf, ' ');
+		char *second_space = strchr(first_space+1, ' ');
+		/*
+		2. Check first argument, if GET proceed
+		*/
+		if (strncmp(buf, "GET", 3) == 0) {
+			char *path = strndup(first_space+1, second_space-first_space - 1);
+			printf("VERI GOOOD!!!! |%s|\n", path);
+
+			/*
+			3. Check if path exists
+			*/
+			if (strcmp("/\0", path) == 0 || access(path, R_OK) == 0) {
+				/*
+				4. If exists print contnents
+				*/
+				printf("path %s exists!\n", path);
+				snprintf(response_code, sizeof response_code, "200 OK");
+				
+				
+				char* last = response_body; 
+				DIR *dr;
+				struct dirent *en;
+
+				if (strcmp("/\0", path) == 0) dr = opendir(".");
+				else {
+					char new_path[300];
+					snprintf(new_path, sizeof new_path, ".%s", path);
+					dr = opendir(new_path);
 				}
+				last = stpcpy(last, "<ul>");
+				if (dr) {
+					while((en = readdir(dr)) != NULL) {
+						printf("DUPA\n");
+						if (en->d_type == DT_REG) {
+							char line[600];
+							char new_path[300];
+							if (strcmp("/\0", path) == 0) snprintf(new_path, sizeof new_path, "%s", en->d_name);
+							else snprintf(new_path, sizeof new_path, "%s/%s", path, en->d_name);
+
+							snprintf(line, sizeof line, "<li><a href=\"%s\" download>%s</a></li>", new_path, en->d_name);
+							last = stpcpy(last, line);
+						} else if (en->d_type == DT_DIR) {
+							char line[600];
+							char new_path[300];
+							if (strcmp("/\0", path) == 0) snprintf(new_path, sizeof new_path, "%s", en->d_name);
+							else snprintf(new_path, sizeof new_path, "%s/%s", path, en->d_name);
+
+							snprintf(line, sizeof line, "<li><a href=\"%s\">%s</a></li>", new_path, en->d_name);
+							last = stpcpy(last, line);
+						}
+					}
+					closedir(dr);
+				}
+				last = strcpy(last, "</ul>");
+			} else {
+				printf("path %s does not exist!\n", path);
+				snprintf(response_code, sizeof response_code, "404 Not Found");
 			}
-			closedir(dr);
-		}
-		last = strcpy(last, "</ul>");
+			
+			free(path);
+		} 
+		
 		snprintf(response, sizeof response,
-		"HTTP/1.1 200 OK\r\n"
+		"HTTP/1.1 %s\r\n"
 		"Content-Type: text/html\r\n"
 		"Content-Length: %zu\r\n"
 		"Connection: close\r\n"
 		"\r\n"
-		"%s", strlen(response_body), response_body);
+		"%s", response_code,strlen(response_body), response_body);
 		if (send(sender_fd, response, strlen(response), 0) == -1) {
 			perror("send");
 		}
