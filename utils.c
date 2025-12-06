@@ -264,11 +264,8 @@ void handle_client_data2(int listener, int *fd_count, struct pollfd *pfds, int *
 		printf("pollsever: recv from fd %d: %.*s", sender_fd, nbytes, buf);
 
 		char response[2048];
-		response[0] = '\0';
 		char response_code[128];
-		response_code[0] = '\0';
 		char response_body[1024];
-		response_body[0] = '\0';
 
 		/*
 		1. Get first line of request
@@ -282,45 +279,43 @@ void handle_client_data2(int listener, int *fd_count, struct pollfd *pfds, int *
 			char *path = strndup(first_space+1, second_space-first_space - 1);
 			printf("VERI GOOOD!!!! |%s|\n", path);
 
+			char path_buffer[1024];
+			if (strcmp(path, "/") == 0) snprintf(path_buffer, sizeof(path_buffer), "."); 
+			else {
+				snprintf(path_buffer, sizeof(path_buffer), ".%s", path);
+			}
+
+
 			/*
 			3. Check if path exists
 			*/
-			if (strcmp("/\0", path) == 0 || access(path, R_OK) == 0) {
+			if (access(path_buffer, R_OK) == 0) {
 				/*
 				4. If exists print contnents
 				*/
-				printf("path %s exists!\n", path);
+				printf("path %s exists!\n", path_buffer);
 				snprintf(response_code, sizeof response_code, "200 OK");
 				
 				
 				char* last = response_body; 
 				DIR *dr;
 				struct dirent *en;
+				dr = opendir(path_buffer);
 
-				if (strcmp("/\0", path) == 0) dr = opendir(".");
-				else {
-					char new_path[300];
-					snprintf(new_path, sizeof new_path, ".%s", path);
-					dr = opendir(new_path);
-				}
 				last = stpcpy(last, "<ul>");
 				if (dr) {
 					while((en = readdir(dr)) != NULL) {
-						printf("DUPA\n");
-						if (en->d_type == DT_REG) {
-							char line[600];
-							char new_path[300];
-							if (strcmp("/\0", path) == 0) snprintf(new_path, sizeof new_path, "%s", en->d_name);
-							else snprintf(new_path, sizeof new_path, "%s/%s", path, en->d_name);
+						if (strcmp(en->d_name, ".") == 0) continue;
 
+						char line[600];
+						char new_path[300];
+						if (strcmp(path, "/\0") == 0) snprintf(new_path, sizeof new_path, "/%s", en->d_name);
+						else snprintf(new_path, sizeof new_path, "%s/%s", path, en->d_name);
+
+						if (en->d_type == DT_REG) {
 							snprintf(line, sizeof line, "<li><a href=\"%s\" download>%s</a></li>", new_path, en->d_name);
 							last = stpcpy(last, line);
 						} else if (en->d_type == DT_DIR) {
-							char line[600];
-							char new_path[300];
-							if (strcmp("/\0", path) == 0) snprintf(new_path, sizeof new_path, "%s", en->d_name);
-							else snprintf(new_path, sizeof new_path, "%s/%s", path, en->d_name);
-
 							snprintf(line, sizeof line, "<li><a href=\"%s\">%s</a></li>", new_path, en->d_name);
 							last = stpcpy(last, line);
 						}
@@ -329,11 +324,12 @@ void handle_client_data2(int listener, int *fd_count, struct pollfd *pfds, int *
 				}
 				last = strcpy(last, "</ul>");
 			} else {
-				printf("path %s does not exist!\n", path);
+				printf("path %s does not exist!\n", path_buffer);
 				snprintf(response_code, sizeof response_code, "404 Not Found");
+				response_body[0] = '\0';
 			}
-			
 			free(path);
+			
 		} 
 		
 		snprintf(response, sizeof response,
