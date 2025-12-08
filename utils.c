@@ -276,7 +276,9 @@ void handle_client_data2(int listener, int *fd_count, struct pollfd *pfds, int *
 		2. Check first argument, if GET proceed
 		*/
 		if (strncmp(buf, "GET", 3) == 0) {
-			char *path = strndup(first_space+1, second_space-first_space - 1);
+			char *path = strndup(first_space+1, second_space-first_space);
+			path[second_space-first_space-1] = '\0';
+
 			printf("VERI GOOOD!!!! |%s|\n", path);
 
 			char path_buffer[1024];
@@ -309,8 +311,10 @@ void handle_client_data2(int listener, int *fd_count, struct pollfd *pfds, int *
 
 						char line[600];
 						char new_path[300];
-						if (strcmp(path, "/\0") == 0) snprintf(new_path, sizeof new_path, "/%s", en->d_name);
-						else snprintf(new_path, sizeof new_path, "%s/%s", path, en->d_name);
+						if (path[strlen(path)-1] == '/') path[strlen(path) - 1] = '\0';
+						// if (strcmp(path, "/\0") == 0) snprintf(new_path, sizeof new_path, "/%s", en->d_name);
+						// else snprintf(new_path, sizeof new_path, "%s/%s", path, en->d_name);
+						snprintf(new_path, sizeof new_path, "%s/%s", path, en->d_name);
 
 						if (en->d_type == DT_REG) {
 							snprintf(line, sizeof line, "<li><a href=\"%s\" download>%s</a></li>", new_path, en->d_name);
