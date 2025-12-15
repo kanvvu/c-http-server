@@ -9,6 +9,7 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <dirent.h>
+#include <errno.h>
 
 #define PORT "9034"
 
@@ -239,6 +240,57 @@ void handle_new_connection2(int listener, int *fd_count, int *fd_size, struct po
 	}
 }
 
+char*  get_mime(char* file_name){
+    FILE *file;
+    char path[1024];
+    path[0] = '\0';
+
+    char path_string[512];
+    snprintf(path_string, sizeof(path_string), "file -i %s", file_name);
+
+    file = popen(path_string, "r");
+    if (file == NULL) {
+        printf("Fail popen!\n");
+        return NULL;
+    }
+
+    if (fgets(path, sizeof(path), file) == NULL) {
+        printf("get_mime: Fail fgets!\n");
+        pclose(file);
+        return NULL;
+    }
+
+    pclose(file);
+
+    if (strlen(path) == 0) {
+        return NULL;
+    }
+
+    char* space_pos = strchr(path, ' ');
+    if (space_pos == NULL) {
+        printf("get_mime: Fail first strchr!\n");
+        return NULL;
+    }
+    
+    char* semicolon_pos = strchr(space_pos+1, ';');
+    if (semicolon_pos == NULL) {
+        printf("get_mime: No semicolon - taking pos of last character!\n");
+        semicolon_pos = path + strlen(path);
+    }
+    semicolon_pos--;
+
+    char *mime_type = strndup(space_pos+1, semicolon_pos-space_pos);
+
+	char *new_line_pos = strchr(mime_type, '\n');
+	if (new_line_pos != NULL) {
+		printf("get_mime: New line detected - stripping it!\n");
+		*new_line_pos = '\0';
+	}
+    // printf("|%s|\n", mime_type);
+    // free(mime_type);
+	return mime_type;
+}
+
 void handle_client_data2(int listener, int *fd_count, struct pollfd *pfds, int *pfd_i) {
 	//even though fresh in each call still can have junk from other calls
 	char buf[1024]; //64, 128, 256, 512, 1024
@@ -266,6 +318,10 @@ void handle_client_data2(int listener, int *fd_count, struct pollfd *pfds, int *
 		char response[2048];
 		char response_code[128];
 		char response_body[1024];
+		char content_type[100];
+		snprintf(content_type, sizeof(content_type), "text/html");
+
+		int is_file = 0;
 
 		/*
 		1. Get first line of request
@@ -326,6 +382,19 @@ void handle_client_data2(int listener, int *fd_count, struct pollfd *pfds, int *
 					}
 					closedir(dr);
 				}
+				else {
+					if (errno == ENOTDIR ) {
+						is_file = 1; 
+						char* mime_type = get_mime(path_buffer);
+						if (mime_type == NULL) {
+							snprintf(content_type, sizeof(content_type), "application/octet-stream");
+						} else {
+							snprintf(content_type, sizeof(content_type), "%s", mime_type);
+						}
+						free(mime_type);
+
+					}
+				}
 				last = strcpy(last, "</ul>");
 			} else {
 				printf("path %s does not exist!\n", path_buffer);
@@ -335,14 +404,16 @@ void handle_client_data2(int listener, int *fd_count, struct pollfd *pfds, int *
 			free(path);
 			
 		} 
+
 		
+		printf("%s\n", content_type);
 		snprintf(response, sizeof response,
 		"HTTP/1.1 %s\r\n"
-		"Content-Type: text/html\r\n"
+		"Content-Type: %s\r\n"
 		"Content-Length: %zu\r\n"
 		"Connection: close\r\n"
 		"\r\n"
-		"%s", response_code,strlen(response_body), response_body);
+		"%s",response_code,content_type,strlen(response_body), response_body);
 		if (send(sender_fd, response, strlen(response), 0) == -1) {
 			perror("send");
 		}
