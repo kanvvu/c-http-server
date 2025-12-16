@@ -4,7 +4,13 @@
 #include <poll.h>
 #include <stddef.h>
 
-
+struct http_response {
+    char response[10000];
+    char response_code[128];
+    char response_body[8000];
+    char content_type[100];
+};
+void create_http_response(char * buf, struct http_response* response); 
 
 
 int sent_greeting(int fd);

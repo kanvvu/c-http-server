@@ -288,7 +288,105 @@ char*  get_mime(char* file_name){
 	}
     // printf("|%s|\n", mime_type);
     // free(mime_type);
+	printf("get_mime: mime+type: %s\n", mime_type);
 	return mime_type;
+}
+
+void create_http_response(char * buf, struct http_response* response) {
+	snprintf(response->content_type, sizeof(response->content_type), "text/html");
+
+	int is_file = 0;
+
+	/*
+	1. Get first line of request
+	*/
+	char *first_space = strchr(buf, ' ');
+	char *second_space = strchr(first_space+1, ' ');
+	/*
+	2. Check first argument, if GET proceed
+	*/
+	if (strncmp(buf, "GET", 3) == 0) {
+		char *path = strndup(first_space+1, second_space-first_space);
+		path[second_space-first_space-1] = '\0';
+
+		printf("VERI GOOOD!!!! |%s|\n", path);
+
+		char path_buffer[1024];
+		if (strcmp(path, "/") == 0) snprintf(path_buffer, sizeof(path_buffer), "."); 
+		else {
+			snprintf(path_buffer, sizeof(path_buffer), ".%s", path);
+		}
+
+
+		/*
+		3. Check if path exists
+		*/
+		if (access(path_buffer, R_OK) == 0) {
+			/*
+			4. If exists print contnents
+			*/
+			printf("path %s exists!\n", path_buffer);
+			snprintf(response->response_code, sizeof response->response_code, "200 OK");
+			
+			
+			char* last = response->response_body; 
+			DIR *dr;
+			struct dirent *en;
+			dr = opendir(path_buffer);
+
+			last = stpcpy(last, "<ul>");
+			if (dr) {
+				while((en = readdir(dr)) != NULL) {
+					if (strcmp(en->d_name, ".") == 0) continue;
+
+					char line[600];
+					char new_path[300];
+					if (path[strlen(path)-1] == '/') path[strlen(path) - 1] = '\0';
+					// if (strcmp(path, "/\0") == 0) snprintf(new_path, sizeof new_path, "/%s", en->d_name);
+					// else snprintf(new_path, sizeof new_path, "%s/%s", path, en->d_name);
+					snprintf(new_path, sizeof new_path, "%s/%s", path, en->d_name);
+
+					if (en->d_type == DT_REG) {
+						snprintf(line, sizeof line, "<li><a href=\"%s\" download>%s</a></li>", new_path, en->d_name);
+						last = stpcpy(last, line);
+					} else if (en->d_type == DT_DIR) {
+						snprintf(line, sizeof line, "<li><a href=\"%s\">-> %s</a></li>", new_path, en->d_name);
+						last = stpcpy(last, line);
+					}
+				}
+				closedir(dr);
+			}
+			else {
+				if (errno == ENOTDIR ) {
+					is_file = 1; 
+					char* mime_type = get_mime(path_buffer);
+					if (mime_type == NULL) {
+						snprintf(response->content_type, sizeof(response->content_type), "application/octet-stream");
+					} else {
+						snprintf(response->content_type, sizeof(response->content_type), "%s", mime_type);
+					}
+					free(mime_type);
+
+				}
+			}
+			last = strcpy(last, "</ul>");
+		} else {
+			printf("path %s does not exist!\n", path_buffer);
+			snprintf(response->response_code, sizeof response->response_code, "404 Not Found");
+			response->response_body[0] = '\0';
+		}
+		free(path);
+		
+	} 
+	
+	printf("content type: |%s|\n", response->content_type);
+	snprintf(response->response, sizeof(response->response),
+	"HTTP/1.1 %s\r\n"
+	"Content-Type: %s\r\n"
+	"Content-Length: %zu\r\n"
+	"Connection: close\r\n"
+	"\r\n"
+	"%s",response->response_code,response->content_type,strlen(response->response_body), response->response_body);
 }
 
 void handle_client_data2(int listener, int *fd_count, struct pollfd *pfds, int *pfd_i) {
@@ -314,111 +412,14 @@ void handle_client_data2(int listener, int *fd_count, struct pollfd *pfds, int *
 		(*pfd_i)--;
 	} else {
 		printf("pollsever: recv from fd %d: %.*s", sender_fd, nbytes, buf);
-
-		char response[2048];
-		char response_code[128];
-		char response_body[1024];
-		char content_type[100];
-		snprintf(content_type, sizeof(content_type), "text/html");
-
-		int is_file = 0;
-
-		/*
-		1. Get first line of request
-		*/
-		char *first_space = strchr(buf, ' ');
-		char *second_space = strchr(first_space+1, ' ');
-		/*
-		2. Check first argument, if GET proceed
-		*/
-		if (strncmp(buf, "GET", 3) == 0) {
-			char *path = strndup(first_space+1, second_space-first_space);
-			path[second_space-first_space-1] = '\0';
-
-			printf("VERI GOOOD!!!! |%s|\n", path);
-
-			char path_buffer[1024];
-			if (strcmp(path, "/") == 0) snprintf(path_buffer, sizeof(path_buffer), "."); 
-			else {
-				snprintf(path_buffer, sizeof(path_buffer), ".%s", path);
-			}
-
-
-			/*
-			3. Check if path exists
-			*/
-			if (access(path_buffer, R_OK) == 0) {
-				/*
-				4. If exists print contnents
-				*/
-				printf("path %s exists!\n", path_buffer);
-				snprintf(response_code, sizeof response_code, "200 OK");
-				
-				
-				char* last = response_body; 
-				DIR *dr;
-				struct dirent *en;
-				dr = opendir(path_buffer);
-
-				last = stpcpy(last, "<ul>");
-				if (dr) {
-					while((en = readdir(dr)) != NULL) {
-						if (strcmp(en->d_name, ".") == 0) continue;
-
-						char line[600];
-						char new_path[300];
-						if (path[strlen(path)-1] == '/') path[strlen(path) - 1] = '\0';
-						// if (strcmp(path, "/\0") == 0) snprintf(new_path, sizeof new_path, "/%s", en->d_name);
-						// else snprintf(new_path, sizeof new_path, "%s/%s", path, en->d_name);
-						snprintf(new_path, sizeof new_path, "%s/%s", path, en->d_name);
-
-						if (en->d_type == DT_REG) {
-							snprintf(line, sizeof line, "<li><a href=\"%s\" download>%s</a></li>", new_path, en->d_name);
-							last = stpcpy(last, line);
-						} else if (en->d_type == DT_DIR) {
-							snprintf(line, sizeof line, "<li><a href=\"%s\">%s</a></li>", new_path, en->d_name);
-							last = stpcpy(last, line);
-						}
-					}
-					closedir(dr);
-				}
-				else {
-					if (errno == ENOTDIR ) {
-						is_file = 1; 
-						char* mime_type = get_mime(path_buffer);
-						if (mime_type == NULL) {
-							snprintf(content_type, sizeof(content_type), "application/octet-stream");
-						} else {
-							snprintf(content_type, sizeof(content_type), "%s", mime_type);
-						}
-						free(mime_type);
-
-					}
-				}
-				last = strcpy(last, "</ul>");
-			} else {
-				printf("path %s does not exist!\n", path_buffer);
-				snprintf(response_code, sizeof response_code, "404 Not Found");
-				response_body[0] = '\0';
-			}
-			free(path);
-			
-		} 
-
 		
-		printf("%s\n", content_type);
-		snprintf(response, sizeof response,
-		"HTTP/1.1 %s\r\n"
-		"Content-Type: %s\r\n"
-		"Content-Length: %zu\r\n"
-		"Connection: close\r\n"
-		"\r\n"
-		"%s",response_code,content_type,strlen(response_body), response_body);
-		if (send(sender_fd, response, strlen(response), 0) == -1) {
+		struct http_response response;
+		create_http_response(buf, &response);
+		if (send(sender_fd, response.response, strlen(response.response), 0) == -1) {
 			perror("send");
 		}
-		printf("response strlen: %ld\n", strlen(response));
 
+		printf("response strlen: %ld\n", strlen(response.response));
 	}
 }
 
