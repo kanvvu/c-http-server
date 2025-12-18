@@ -293,7 +293,8 @@ char*  get_mime(char* file_name){
 }
 
 void create_http_response(char * buf, struct http_response* response) {
-	snprintf(response->content_type, sizeof(response->content_type), "text/html");
+	// snprintf(response->content_type, sizeof(response->content_type), "text/html");
+	k_string_append(&response->response_type, "text/html");
 
 	int is_file = 0;
 
@@ -326,15 +327,22 @@ void create_http_response(char * buf, struct http_response* response) {
 			4. If exists print contnents
 			*/
 			printf("path %s exists!\n", path_buffer);
-			snprintf(response->response_code, sizeof response->response_code, "200 OK");
+			// snprintf(response->response_code, sizeof response->response_code, "200 OK");
+			k_string_append(&response->response_code, "200 OK");
 			
 			
 			char* last = response->response_body; 
+			const char* first = response->response_body;
+			int body_size = sizeof(response->response_body);
+
 			DIR *dr;
 			struct dirent *en;
 			dr = opendir(path_buffer);
 
-			last = stpcpy(last, "<ul>");
+			// do stpcpy when size src is less than dest
+			// we need size of dest, 
+			int avaible_size = (body_size - (last - first));
+			last = stpncpy(last, "<ul>", avaible_size);
 			if (dr) {
 				while((en = readdir(dr)) != NULL) {
 					if (strcmp(en->d_name, ".") == 0) continue;
@@ -348,10 +356,12 @@ void create_http_response(char * buf, struct http_response* response) {
 
 					if (en->d_type == DT_REG) {
 						snprintf(line, sizeof line, "<li><a href=\"%s\" download>%s</a></li>", new_path, en->d_name);
-						last = stpcpy(last, line);
+						int avaible_size = (body_size - (last - first));
+						last = stpncpy(last, line, avaible_size);
 					} else if (en->d_type == DT_DIR) {
 						snprintf(line, sizeof line, "<li><a href=\"%s\">-> %s</a></li>", new_path, en->d_name);
-						last = stpcpy(last, line);
+						int avaible_size = (body_size - (last - first));
+						last = stpncpy(last, line, avaible_size);
 					}
 				}
 				closedir(dr);
@@ -369,7 +379,8 @@ void create_http_response(char * buf, struct http_response* response) {
 
 				}
 			}
-			last = strcpy(last, "</ul>");
+			avaible_size = (body_size - (last - first));
+			last = stpncpy(last, "</ul>", avaible_size);
 		} else {
 			printf("path %s does not exist!\n", path_buffer);
 			snprintf(response->response_code, sizeof response->response_code, "404 Not Found");
@@ -414,12 +425,14 @@ void handle_client_data2(int listener, int *fd_count, struct pollfd *pfds, int *
 		printf("pollsever: recv from fd %d: %.*s", sender_fd, nbytes, buf);
 		
 		struct http_response response;
+		http_response_init(&response);
 		create_http_response(buf, &response);
-		if (send(sender_fd, response.response, strlen(response.response), 0) == -1) {
+		if (send(sender_fd, response.response.str, strlen(response.response.str), 0) == -1) {
 			perror("send");
 		}
 
-		printf("response strlen: %ld\n", strlen(response.response));
+		printf("response strlen: %ld\n", strlen(response.response.str));
+		http_response_free(&response);
 	}
 }
 
@@ -434,4 +447,71 @@ void process_connections2(int listener, int *fd_count, int *fd_size, struct poll
 			}
 		}
 	}
+}
+
+void http_response_init(struct http_response* response) {
+	k_string_init(&response->response);
+	k_string_init(&response->response_body);
+	k_string_init(&response->response_code);
+	k_string_init(&response->response_type);
+}
+void http_response_free(struct http_response* response) {
+	k_string_free(&response->response);
+	k_string_free(&response->response_body);
+	k_string_free(&response->response_code);
+	k_string_free(&response->response_type);
+}
+
+void k_string_init(struct k_string* str) {
+	str->max_size = 64; 
+	str->str = malloc(str->max_size*sizeof(char));
+	if (str->str == NULL) {
+			printf("k_string_init: malloc error!\n");
+			exit(1);
+		}
+	str->str[0] = '\0';
+	str->end = str->str;
+}
+void k_string_temp(struct k_string* str1, const char * str2) {
+	int length1 = str1->end - str1->str;
+	int length2 = strlen(str2);
+	
+	if (str1->max_size <= length1 + length2) {
+		while(str1->max_size <= length1 + length2) str1->max_size *= 2;
+		
+		// printf("k_string_append: new max_size %i\n", str1->max_size);
+		char * temp = realloc(str1->str, str1->max_size);
+		if (temp == NULL) {
+			k_string_free(str1);
+			printf("k_string_append: realloc error!\n");
+			exit(1);
+		}
+		str1->str = temp;
+		str1->end = str1->str + length1;
+	}
+}
+
+void k_string_set(struct k_string* str1, const char * str2) {
+	int length1 = str1->end - str1->str;
+	int length2 = strlen(str2);
+
+	k_string_temp(str1, str2);
+
+	str1->end = stpcpy(str1->str, str2);
+	str1->str[length1 + length2] = '\0';
+}
+
+void k_string_append(struct k_string* str1, const char * str2) {
+	int length1 = str1->end - str1->str;
+	int length2 = strlen(str2);
+	
+	k_string_temp(str1, str2);
+
+	str1->end = stpcpy(str1->end, str2);
+	str1->str[length1 + length2] = '\0';
+}
+
+void k_string_free(struct k_string* str) {
+	free(str->str);
+	str->end = NULL;
 }

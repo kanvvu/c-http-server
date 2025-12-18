@@ -16,8 +16,8 @@ run:
 runc:
 	./bin/client
 
-runt: temp.c
-	gcc -o bin/temp temp.c && ./bin/temp
+runt: temp.c utils.c
+	gcc -o bin/temp temp.c utils.c && ./bin/temp
 
 clean: 
 	rm -f *.o bin/*
