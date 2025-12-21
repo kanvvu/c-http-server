@@ -294,7 +294,7 @@ char*  get_mime(char* file_name){
 
 void create_http_response(char * buf, struct http_response* response) {
 	// snprintf(response->content_type, sizeof(response->content_type), "text/html");
-	k_string_append(&response->response_type, "text/html");
+	k_string_set(&response->response_type, "text/html");
 
 	int is_file = 0;
 
@@ -328,12 +328,9 @@ void create_http_response(char * buf, struct http_response* response) {
 			*/
 			printf("path %s exists!\n", path_buffer);
 			// snprintf(response->response_code, sizeof response->response_code, "200 OK");
-			k_string_append(&response->response_code, "200 OK");
+			k_string_set(&response->response_code, "200 OK");
 			
 			
-			char* last = response->response_body; 
-			const char* first = response->response_body;
-			int body_size = sizeof(response->response_body);
 
 			DIR *dr;
 			struct dirent *en;
@@ -341,8 +338,7 @@ void create_http_response(char * buf, struct http_response* response) {
 
 			// do stpcpy when size src is less than dest
 			// we need size of dest, 
-			int avaible_size = (body_size - (last - first));
-			last = stpncpy(last, "<ul>", avaible_size);
+			k_string_append(&response->response_body, "<ul>");
 			if (dr) {
 				while((en = readdir(dr)) != NULL) {
 					if (strcmp(en->d_name, ".") == 0) continue;
@@ -356,12 +352,10 @@ void create_http_response(char * buf, struct http_response* response) {
 
 					if (en->d_type == DT_REG) {
 						snprintf(line, sizeof line, "<li><a href=\"%s\" download>%s</a></li>", new_path, en->d_name);
-						int avaible_size = (body_size - (last - first));
-						last = stpncpy(last, line, avaible_size);
+						k_string_append(&response->response_body, line);
 					} else if (en->d_type == DT_DIR) {
 						snprintf(line, sizeof line, "<li><a href=\"%s\">-> %s</a></li>", new_path, en->d_name);
-						int avaible_size = (body_size - (last - first));
-						last = stpncpy(last, line, avaible_size);
+						k_string_append(&response->response_body, line);
 					}
 				}
 				closedir(dr);
@@ -371,33 +365,41 @@ void create_http_response(char * buf, struct http_response* response) {
 					is_file = 1; 
 					char* mime_type = get_mime(path_buffer);
 					if (mime_type == NULL) {
-						snprintf(response->content_type, sizeof(response->content_type), "application/octet-stream");
+						k_string_set(&response->response_type, "application/octet-stream");
 					} else {
-						snprintf(response->content_type, sizeof(response->content_type), "%s", mime_type);
+						k_string_set(&response->response_type, mime_type);
 					}
 					free(mime_type);
 
 				}
 			}
-			avaible_size = (body_size - (last - first));
-			last = stpncpy(last, "</ul>", avaible_size);
+			k_string_append(&response->response_body, "</ul>");
 		} else {
 			printf("path %s does not exist!\n", path_buffer);
-			snprintf(response->response_code, sizeof response->response_code, "404 Not Found");
-			response->response_body[0] = '\0';
+			k_string_set(&response->response_code, "404 Not Found");
 		}
 		free(path);
 		
 	} 
 	
-	printf("content type: |%s|\n", response->content_type);
-	snprintf(response->response, sizeof(response->response),
-	"HTTP/1.1 %s\r\n"
-	"Content-Type: %s\r\n"
-	"Content-Length: %zu\r\n"
-	"Connection: close\r\n"
-	"\r\n"
-	"%s",response->response_code,response->content_type,strlen(response->response_body), response->response_body);
+	k_string_append(&response->response, "HTTP/1.1 ");
+	k_string_append(&response->response, response->response_code.str);
+	k_string_append(&response->response, "\r\n");
+
+	k_string_append(&response->response, "Content-Type: ");
+	k_string_append(&response->response, response->response_type.str);
+	k_string_append(&response->response, "\r\n");
+
+	k_string_append(&response->response, "Content-Length: ");
+	char content_length[64];
+	snprintf(content_length, sizeof (content_length), "%zu", strlen(response->response_body.str));
+	k_string_append(&response->response, content_length);
+	k_string_append(&response->response, "\r\n");
+
+	k_string_append(&response->response, "Connection: close\r\n");
+	k_string_append(&response->response, "\r\n");
+
+	k_string_append(&response->response, response->response_body.str);
 }
 
 void handle_client_data2(int listener, int *fd_count, struct pollfd *pfds, int *pfd_i) {
@@ -498,7 +500,7 @@ void k_string_set(struct k_string* str1, const char * str2) {
 	k_string_temp(str1, str2);
 
 	str1->end = stpcpy(str1->str, str2);
-	str1->str[length1 + length2] = '\0';
+	str1->str[length2] = '\0';
 }
 
 void k_string_append(struct k_string* str1, const char * str2) {
