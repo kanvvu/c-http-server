@@ -286,8 +286,6 @@ char*  get_mime(char* file_name){
 		printf("get_mime: New line detected - stripping it!\n");
 		*new_line_pos = '\0';
 	}
-    // printf("|%s|\n", mime_type);
-    // free(mime_type);
 	printf("get_mime: mime+type: %s\n", mime_type);
 	return mime_type;
 }
@@ -302,7 +300,15 @@ void create_http_response(char * buf, struct http_response* response) {
 	1. Get first line of request
 	*/
 	char *first_space = strchr(buf, ' ');
+	if (first_space == NULL) {
+		make_internal_server_error(response);
+		return;
+	}
 	char *second_space = strchr(first_space+1, ' ');
+	if (second_space == NULL) {
+		make_internal_server_error(response);
+		return;
+	}
 	/*
 	2. Check first argument, if GET proceed
 	*/
@@ -364,11 +370,9 @@ void create_http_response(char * buf, struct http_response* response) {
 				if (errno == ENOTDIR ) {
 					is_file = 1; 
 					char* mime_type = get_mime(path_buffer);
-					if (mime_type == NULL) {
-						k_string_set(&response->response_type, "application/octet-stream");
-					} else {
-						k_string_set(&response->response_type, mime_type);
-					}
+					if (mime_type == NULL) k_string_set(&response->response_type, "application/octet-stream");
+					else k_string_set(&response->response_type, mime_type);
+					
 					free(mime_type);
 
 				}
@@ -401,6 +405,28 @@ void create_http_response(char * buf, struct http_response* response) {
 
 	k_string_append(&response->response, response->response_body.str);
 }
+
+void make_internal_server_error(struct http_response* response) {
+	k_string_append(&response->response, "HTTP/1.1 ");
+	k_string_set(&response->response_code, "500 Internal Server Error");
+	k_string_append(&response->response, response->response_code.str);
+	k_string_append(&response->response, "\r\n");
+
+	k_string_append(&response->response, "Content-Type: ");
+	k_string_append(&response->response, response->response_type.str);
+	k_string_append(&response->response, "\r\n");
+
+	k_string_append(&response->response, "Content-Length: ");
+	char content_length[64];
+	snprintf(content_length, sizeof (content_length), "%zu", strlen(response->response_body.str));
+	k_string_append(&response->response, content_length);
+	k_string_append(&response->response, "\r\n");
+
+	k_string_append(&response->response, "Connection: close\r\n");
+	k_string_append(&response->response, "\r\n");
+
+	k_string_append(&response->response, response->response_body.str);
+} 
 
 void handle_client_data2(int listener, int *fd_count, struct pollfd *pfds, int *pfd_i) {
 	//even though fresh in each call still can have junk from other calls
