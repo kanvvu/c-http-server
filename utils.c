@@ -385,8 +385,12 @@ void create_http_response(char * buf, struct http_response* response) {
 		free(path);
 		
 	} 
+	make_response(response);
 	
-	k_string_append(&response->response, "HTTP/1.1 ");
+}
+
+void make_response(struct http_response* response) {
+	k_string_set(&response->response, "HTTP/1.1 ");
 	k_string_append(&response->response, response->response_code.str);
 	k_string_append(&response->response, "\r\n");
 
@@ -407,25 +411,18 @@ void create_http_response(char * buf, struct http_response* response) {
 }
 
 void make_internal_server_error(struct http_response* response) {
-	k_string_append(&response->response, "HTTP/1.1 ");
-	k_string_set(&response->response_code, "500 Internal Server Error");
-	k_string_append(&response->response, response->response_code.str);
+	k_string_set(&response->response, "HTTP/1.1 500 Internal Server Error");
 	k_string_append(&response->response, "\r\n");
 
 	k_string_append(&response->response, "Content-Type: ");
-	k_string_append(&response->response, response->response_type.str);
+	k_string_append(&response->response, "text/html");
 	k_string_append(&response->response, "\r\n");
 
-	k_string_append(&response->response, "Content-Length: ");
-	char content_length[64];
-	snprintf(content_length, sizeof (content_length), "%zu", strlen(response->response_body.str));
-	k_string_append(&response->response, content_length);
+	k_string_append(&response->response, "Content-Length: 0");
 	k_string_append(&response->response, "\r\n");
 
 	k_string_append(&response->response, "Connection: close\r\n");
 	k_string_append(&response->response, "\r\n");
-
-	k_string_append(&response->response, response->response_body.str);
 } 
 
 void handle_client_data2(int listener, int *fd_count, struct pollfd *pfds, int *pfd_i) {

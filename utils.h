@@ -15,6 +15,7 @@ void k_string_set(struct k_string* str1, const char * str2);
 void k_string_append(struct k_string* str1, const char * str2);
 void k_string_free(struct k_string* str);
 
+
 // struct http_response {
 //     char response[1000];
 //     char response_code[128];
@@ -32,6 +33,9 @@ void http_response_init(struct http_response* response);
 void http_response_free(struct http_response* response);
 
 void create_http_response(char * buf, struct http_response* response); 
+
+void make_response(struct http_response* response);
+void make_internal_server_error(struct http_response* response);
 
 
 
