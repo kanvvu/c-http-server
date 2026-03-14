@@ -344,8 +344,8 @@ void create_http_response(char * buf, struct http_response* response) {
 
 			// do stpcpy when size src is less than dest
 			// we need size of dest, 
-			k_string_append(&response->response_body, "<ul>");
 			if (dr) {
+				k_string_append(&response->response_body, "<ul>");
 				while((en = readdir(dr)) != NULL) {
 					if (strcmp(en->d_name, ".") == 0) continue;
 
@@ -364,6 +364,7 @@ void create_http_response(char * buf, struct http_response* response) {
 						k_string_append(&response->response_body, line);
 					}
 				}
+				k_string_append(&response->response_body, "</ul>");
 				closedir(dr);
 			}
 			else {
@@ -372,12 +373,28 @@ void create_http_response(char * buf, struct http_response* response) {
 					char* mime_type = get_mime(path_buffer);
 					if (mime_type == NULL) k_string_set(&response->response_type, "application/octet-stream");
 					else k_string_set(&response->response_type, mime_type);
+
+					printf("NOT A DIRECTORY: |%s|\n", path_buffer);
+					FILE *fptr = fopen(path_buffer, "r");
+					if (fptr == NULL) {
+						perror("");
+						exit(1);
+					}
+					char ch[1];
+					k_string_set(&response->response_body, "");
+					int size = 0;
+					while (fread(ch, sizeof(char), 1, fptr) == 1) {
+						k_string_appendc(&response->response_body, ch[0]);
+						size++;
+					}
+					printf("\tsize of bin: %i\n", size);
+
+					fclose(fptr);
 					
 					free(mime_type);
 
 				}
 			}
-			k_string_append(&response->response_body, "</ul>");
 		} else {
 			printf("path %s does not exist!\n", path_buffer);
 			k_string_set(&response->response_code, "404 Not Found");
@@ -400,14 +417,14 @@ void make_response(struct http_response* response) {
 
 	k_string_append(&response->response, "Content-Length: ");
 	char content_length[64];
-	snprintf(content_length, sizeof (content_length), "%zu", strlen(response->response_body.str));
+	snprintf(content_length, sizeof (content_length), "%zu", k_string_length(&response->response_body));
 	k_string_append(&response->response, content_length);
 	k_string_append(&response->response, "\r\n");
 
 	k_string_append(&response->response, "Connection: close\r\n");
 	k_string_append(&response->response, "\r\n");
 
-	k_string_append(&response->response, response->response_body.str);
+	k_string_appendk(&response->response, &response->response_body);
 }
 
 void make_internal_server_error(struct http_response* response) {
@@ -437,11 +454,11 @@ void handle_client_data2(int listener, int *fd_count, struct pollfd *pfds, int *
 
 
 	if (nbytes <=0 ) {
-		if (nbytes == 0) {
+		if (nbytes == 0) 
 			printf("pollserver: socket %d hung up\n", sender_fd);
-		} else {
+		else 
 			perror("recv");
-		}
+		
 
 		close(pfds[*pfd_i].fd);
 		del_from_pfds(pfds, *pfd_i, fd_count);
@@ -452,11 +469,11 @@ void handle_client_data2(int listener, int *fd_count, struct pollfd *pfds, int *
 		struct http_response response;
 		http_response_init(&response);
 		create_http_response(buf, &response);
-		if (send(sender_fd, response.response.str, strlen(response.response.str), 0) == -1) {
+		if (send(sender_fd, response.response.str, k_string_length(&response.response), 0) == -1) {
 			perror("send");
 		}
 
-		printf("response strlen: %ld\n", strlen(response.response.str));
+		printf("response strlen: %ld\n", k_string_length(&response.response));
 		http_response_free(&response);
 	}
 }
@@ -497,30 +514,34 @@ void k_string_init(struct k_string* str) {
 	str->str[0] = '\0';
 	str->end = str->str;
 }
-void k_string_temp(struct k_string* str1, const char * str2) {
-	int length1 = str1->end - str1->str;
-	int length2 = strlen(str2);
+
+size_t k_string_length(struct k_string* str1) {
+	return str1->end - str1->str;
+}
+
+void k_string_temp(struct k_string* str1, int length1, int length2) {
+	if (str1->max_size > length1 + length2)
+		return;
+
+	while(str1->max_size <= length1 + length2) str1->max_size *= 2;
 	
-	if (str1->max_size <= length1 + length2) {
-		while(str1->max_size <= length1 + length2) str1->max_size *= 2;
-		
-		// printf("k_string_append: new max_size %i\n", str1->max_size);
-		char * temp = realloc(str1->str, str1->max_size);
-		if (temp == NULL) {
-			k_string_free(str1);
-			printf("k_string_append: realloc error!\n");
-			exit(1);
-		}
-		str1->str = temp;
-		str1->end = str1->str + length1;
+	// printf("k_string_append: new max_size %i\n", str1->max_size);
+	char * temp = realloc(str1->str, str1->max_size);
+	if (temp == NULL) {
+		k_string_free(str1);
+		printf("k_string_append: realloc error!\n");
+		exit(1);
 	}
+	str1->str = temp;
+	str1->end = str1->str + length1;
+	
 }
 
 void k_string_set(struct k_string* str1, const char * str2) {
 	int length1 = str1->end - str1->str;
 	int length2 = strlen(str2);
 
-	k_string_temp(str1, str2);
+	k_string_temp(str1, length1, length2);
 
 	str1->end = stpcpy(str1->str, str2);
 	str1->str[length2] = '\0';
@@ -530,10 +551,34 @@ void k_string_append(struct k_string* str1, const char * str2) {
 	int length1 = str1->end - str1->str;
 	int length2 = strlen(str2);
 	
-	k_string_temp(str1, str2);
+	k_string_temp(str1, length1, length2);
 
 	str1->end = stpcpy(str1->end, str2);
 	str1->str[length1 + length2] = '\0';
+}
+
+void k_string_appendc(struct k_string* str1, const char c) {
+	int length1 = str1->end - str1->str;
+	int length2 = 1;
+	
+	k_string_temp(str1, length1, length2);
+
+
+	str1->str[length1] = c;
+	str1->str[length1+1] = '\0';
+	str1->end = str1->str + (length1+1);
+}
+
+void k_string_appendk(struct k_string* str1, struct k_string* str2) {
+	int length1 = str1->end - str1->str;
+	int length2 = str2->end - str2->str; 
+	
+	k_string_temp(str1, length1, length2);
+
+	// str1->end = stpcpy(str1->end, str2);
+	mempcpy(str1->end, str2->str, length2);
+	str1->str[length1 + length2] = '\0';
+	str1->end = str1->str + (length1+length2);
 }
 
 void k_string_free(struct k_string* str) {
