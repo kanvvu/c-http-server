@@ -1,14 +1,14 @@
 all: main client
 
-main: main.c utils.o
-	gcc -o bin/main main.c utils.o
+main: src/main.c obj/utils.o obj/k_string.o
+	gcc -o bin/main src/main.c obj/utils.o obj/k_string.o
 
-client: client.c utils.o
-	gcc -o bin/client client.c utils.o
+client: src/client.c obj/utils.o obj/k_string.o
+	gcc -o bin/client src/client.c obj/utils.o obj/k_string.o
 
-fork_test: fork_test.c
-
-%.o: %.c
+# $<: This is a Makefile automatic variable that represents the first prerequisite (dependency) of the rule.
+# $@: Represents the target of the rule.
+obj/%.o: src/%.c
 	gcc -c $< -o $@
 
 run:
@@ -16,8 +16,8 @@ run:
 runc:
 	./bin/client
 
-runt: temp.c utils.c
-	gcc -o bin/temp temp.c utils.c && ./bin/temp
+runt: src/temp.c src/utils.c src/k_string.c
+	gcc -o bin/temp src/temp.c src/utils.c src/k_string.c && ./bin/temp
 
 clean: 
-	rm -f *.o bin/*
+	rm -f *.o bin/* obj/*

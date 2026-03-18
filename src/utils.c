@@ -154,89 +154,6 @@ void handle_new_connection(int listener, int *fd_count, int *fd_size, struct pol
 		add_to_pfds(pfds, newfd, fd_count, fd_size);
 
 		printf("pollserver: new connection from %s on socket %d\n", inet_ntop2(&remoteaddr, remoteIP, sizeof remoteIP), newfd);
-
-
-		//lets greet our client!
-		char msg[128];
-		snprintf(msg, sizeof msg, "\nWelcome traveler! I hope you will have fun!\r\nFrom now you will be known as user%d! What interesting you have to say?\r\n\n", newfd);
-		if (send(newfd, msg, strlen(msg), 0) == -1) {
-			perror("send");
-		}
-
-	}
-}
-
-
-void handle_client_data(int listener, int *fd_count, struct pollfd *pfds, int *pfd_i) {
-	//even though fresh in each call still can have junk from other calls
-	char buf[256];
-
-	//the one who is recived data is the one who sent it
-	int sender_fd = pfds[*pfd_i].fd;
-
-	int nbytes = recv(sender_fd, buf, sizeof buf, 0);
-	buf[nbytes] = '\0';
-
-
-	if (nbytes <=0 ) {
-		if (nbytes == 0) {
-			printf("pollserver: socket %d hung up\n", sender_fd);
-		} else {
-			perror("recv");
-		}
-
-		close(pfds[*pfd_i].fd);
-		del_from_pfds(pfds, *pfd_i, fd_count);
-		(*pfd_i)--;
-	} else {
-		printf("pollsever: recv from fd %d: %.*s", sender_fd, nbytes, buf);
-
-		for(int j=0; j<*fd_count; j++) {
-			int dest_fd = pfds[j].fd;
-
-			if (dest_fd != listener && dest_fd != sender_fd) {
-				char* nickname = "user";
-				char temp[300];
-
-				snprintf(temp, sizeof temp, "%s%d: %s", nickname, sender_fd, buf);
-
-				if (send(dest_fd, temp, strlen(temp), 0) == -1) {
-					perror("send");
-				}
-
-			}
-		}
-	}
-}
-
-void process_connections(int listener, int *fd_count, int *fd_size, struct pollfd **pfds) {
-	for(int i=0; i<*fd_count; i++) {
-		if ((*pfds)[i].revents & (POLLIN | POLLHUP)) {
-
-			if ((*pfds)[i].fd == listener) {
-				handle_new_connection(listener, fd_count, fd_size, pfds);
-			} else {
-				handle_client_data(listener, fd_count, *pfds, &i);
-			}
-		}
-	}
-}
-
-void handle_new_connection2(int listener, int *fd_count, int *fd_size, struct pollfd **pfds) {
-	struct sockaddr_storage remoteaddr;
-	socklen_t addrlen;
-	int newfd;
-	char remoteIP[INET6_ADDRSTRLEN];
-
-	addrlen = sizeof remoteaddr;
-	newfd = accept(listener, (struct sockaddr *)&remoteaddr, &addrlen);
-
-	if (newfd == -1) {
-		perror("accept");
-	} else {
-		add_to_pfds(pfds, newfd, fd_count, fd_size);
-
-		printf("pollserver: new connection from %s on socket %d\n", inet_ntop2(&remoteaddr, remoteIP, sizeof remoteIP), newfd);
 	}
 }
 
@@ -442,7 +359,7 @@ void make_internal_server_error(struct http_response* response) {
 	k_string_append(&response->response, "\r\n");
 } 
 
-void handle_client_data2(int listener, int *fd_count, struct pollfd *pfds, int *pfd_i) {
+void handle_client_data(int listener, int *fd_count, struct pollfd *pfds, int *pfd_i) {
 	//even though fresh in each call still can have junk from other calls
 	char buf[1024]; //64, 128, 256, 512, 1024
 
@@ -478,14 +395,14 @@ void handle_client_data2(int listener, int *fd_count, struct pollfd *pfds, int *
 	}
 }
 
-void process_connections2(int listener, int *fd_count, int *fd_size, struct pollfd **pfds) {
+void process_connections(int listener, int *fd_count, int *fd_size, struct pollfd **pfds) {
 	for(int i=0; i<*fd_count; i++) {
 		if ((*pfds)[i].revents & (POLLIN | POLLHUP)) {
 
 			if ((*pfds)[i].fd == listener) {
-				handle_new_connection2(listener, fd_count, fd_size, pfds);
+				handle_new_connection(listener, fd_count, fd_size, pfds);
 			} else {
-				handle_client_data2(listener, fd_count, *pfds, &i);
+				handle_client_data(listener, fd_count, *pfds, &i);
 			}
 		}
 	}
@@ -502,86 +419,4 @@ void http_response_free(struct http_response* response) {
 	k_string_free(&response->response_body);
 	k_string_free(&response->response_code);
 	k_string_free(&response->response_type);
-}
-
-void k_string_init(struct k_string* str) {
-	str->max_size = 64; 
-	str->str = malloc(str->max_size*sizeof(char));
-	if (str->str == NULL) {
-			printf("k_string_init: malloc error!\n");
-			exit(1);
-		}
-	str->str[0] = '\0';
-	str->end = str->str;
-}
-
-size_t k_string_length(struct k_string* str1) {
-	return str1->end - str1->str;
-}
-
-void k_string_temp(struct k_string* str1, int length1, int length2) {
-	if (str1->max_size > length1 + length2)
-		return;
-
-	while(str1->max_size <= length1 + length2) str1->max_size *= 2;
-	
-	// printf("k_string_append: new max_size %i\n", str1->max_size);
-	char * temp = realloc(str1->str, str1->max_size);
-	if (temp == NULL) {
-		k_string_free(str1);
-		printf("k_string_append: realloc error!\n");
-		exit(1);
-	}
-	str1->str = temp;
-	str1->end = str1->str + length1;
-	
-}
-
-void k_string_set(struct k_string* str1, const char * str2) {
-	int length1 = str1->end - str1->str;
-	int length2 = strlen(str2);
-
-	k_string_temp(str1, length1, length2);
-
-	str1->end = stpcpy(str1->str, str2);
-	str1->str[length2] = '\0';
-}
-
-void k_string_append(struct k_string* str1, const char * str2) {
-	int length1 = str1->end - str1->str;
-	int length2 = strlen(str2);
-	
-	k_string_temp(str1, length1, length2);
-
-	str1->end = stpcpy(str1->end, str2);
-	str1->str[length1 + length2] = '\0';
-}
-
-void k_string_appendc(struct k_string* str1, const char c) {
-	int length1 = str1->end - str1->str;
-	int length2 = 1;
-	
-	k_string_temp(str1, length1, length2);
-
-
-	str1->str[length1] = c;
-	str1->str[length1+1] = '\0';
-	str1->end = str1->str + (length1+1);
-}
-
-void k_string_appendk(struct k_string* str1, struct k_string* str2) {
-	int length1 = str1->end - str1->str;
-	int length2 = str2->end - str2->str; 
-	
-	k_string_temp(str1, length1, length2);
-
-	// str1->end = stpcpy(str1->end, str2);
-	mempcpy(str1->end, str2->str, length2);
-	str1->str[length1 + length2] = '\0';
-	str1->end = str1->str + (length1+length2);
-}
-
-void k_string_free(struct k_string* str) {
-	free(str->str);
-	str->end = NULL;
 }
