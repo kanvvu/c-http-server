@@ -207,11 +207,10 @@ char*  get_mime(char* file_name){
 	return mime_type;
 }
 
-void create_http_response(char * buf, struct http_response* response) {
+void download_response(char * buf, struct http_response* response) {
 	// snprintf(response->content_type, sizeof(response->content_type), "text/html");
 	k_string_set(&response->response_type, "text/html");
 
-	int is_file = 0;
 
 	/*
 	1. Get first line of request
@@ -286,6 +285,99 @@ void create_http_response(char * buf, struct http_response* response) {
 			}
 			else {
 				if (errno == ENOTDIR ) {
+					char* mime_type = get_mime(path_buffer);
+					if (mime_type == NULL) k_string_set(&response->response_type, "application/octet-stream");
+					else k_string_set(&response->response_type, mime_type);
+
+					printf("NOT A DIRECTORY: |%s|\n", path_buffer);
+					FILE *fptr = fopen(path_buffer, "r");
+					if (fptr == NULL) {
+						perror("");
+						exit(1);
+					}
+					char ch[1];
+					k_string_set(&response->response_body, "");
+					int size = 0;
+					while (fread(ch, sizeof(char), 1, fptr) == 1) {
+						k_string_appendc(&response->response_body, ch[0]);
+						size++;
+					}
+					printf("\tsize of bin: %i\n", size);
+
+					fclose(fptr);
+					
+					free(mime_type);
+				}
+			}
+		} else {
+			printf("path %s does not exist!\n", path_buffer);
+			k_string_set(&response->response_code, "404 Not Found");
+		}
+		free(path);
+		
+	} 
+	make_response(response);
+}
+
+void html_response(char * buf, struct http_response* response) {
+	// snprintf(response->content_type, sizeof(response->content_type), "text/html");
+	k_string_set(&response->response_type, "text/html");
+
+	int is_file = 0;
+
+	/*
+	1. Get first line of request
+	*/
+	char *first_space = strchr(buf, ' ');
+	if (first_space == NULL) {
+		make_internal_server_error(response);
+		return;
+	}
+	char *second_space = strchr(first_space+1, ' ');
+	if (second_space == NULL) {
+		make_internal_server_error(response);
+		return;
+	}
+	/*
+	2. Check first argument, if GET proceed
+	*/
+	if (strncmp(buf, "GET", 3) == 0) {
+		char *path = strndup(first_space+1, second_space-first_space);
+		path[second_space-first_space-1] = '\0';
+
+		printf("VERI GOOOD!!!! |%s|\n", path);
+
+		char path_buffer[1024];
+		if (strcmp(path, "/") == 0) snprintf(path_buffer, sizeof(path_buffer), "."); 
+		else {
+			snprintf(path_buffer, sizeof(path_buffer), ".%s", path);
+		}
+
+
+		/*
+		3. Check if path exists
+		*/
+		if (access(path_buffer, R_OK) == 0) {
+			/*
+			4. If exists print contnents
+			*/
+			printf("path %s exists!\n", path_buffer);
+			// snprintf(response->response_code, sizeof response->response_code, "200 OK");
+			k_string_set(&response->response_code, "200 OK");
+			
+			
+
+			DIR *dr;
+			struct dirent *en;
+			dr = opendir(path_buffer);
+
+			// do stpcpy when size src is less than dest
+			// we need size of dest, 
+			if (dr) {
+				closedir(dr);
+			}
+			else {
+				if (errno == ENOTDIR ) {
 					is_file = 1; 
 					char* mime_type = get_mime(path_buffer);
 					if (mime_type == NULL) k_string_set(&response->response_type, "application/octet-stream");
@@ -320,7 +412,10 @@ void create_http_response(char * buf, struct http_response* response) {
 		
 	} 
 	make_response(response);
-	
+}
+
+void create_http_response(char * buf, struct http_response* response) {
+	html_response(buf, response);
 }
 
 void make_response(struct http_response* response) {
