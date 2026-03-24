@@ -10,8 +10,9 @@
 #include <netdb.h>
 #include <dirent.h>
 #include <errno.h>
+#include <stdbool.h>
 
-#define PORT "9034"
+#define PORT "1313"
 
 int sent_msg(int fd, char * msg) {
 	int len, bytes_sent;
@@ -157,10 +158,11 @@ void handle_new_connection(int listener, int *fd_count, int *fd_size, struct pol
 	}
 }
 
-char*  get_mime(char* file_name){
+void  get_mime_file(char* file_name, char *buffer, size_t buffer_size){
     FILE *file;
     char path[1024];
     path[0] = '\0';
+	buffer[0] = '\0';
 
     char path_string[512];
     snprintf(path_string, sizeof(path_string), "file -i %s", file_name);
@@ -168,25 +170,25 @@ char*  get_mime(char* file_name){
     file = popen(path_string, "r");
     if (file == NULL) {
         printf("Fail popen!\n");
-        return NULL;
+        return;
     }
 
     if (fgets(path, sizeof(path), file) == NULL) {
         printf("get_mime: Fail fgets!\n");
         pclose(file);
-        return NULL;
+        return;
     }
 
     pclose(file);
 
     if (strlen(path) == 0) {
-        return NULL;
+        return;
     }
 
     char* space_pos = strchr(path, ' ');
     if (space_pos == NULL) {
         printf("get_mime: Fail first strchr!\n");
-        return NULL;
+        return;
     }
     
     char* semicolon_pos = strchr(space_pos+1, ';');
@@ -196,15 +198,68 @@ char*  get_mime(char* file_name){
     }
     semicolon_pos--;
 
-    char *mime_type = strndup(space_pos+1, semicolon_pos-space_pos);
+	if (semicolon_pos-space_pos >= buffer_size) {
+		printf("get_mime: Error excited buffer size!\n");
+		return;
+	}
 
-	char *new_line_pos = strchr(mime_type, '\n');
+	memcpy(buffer, space_pos+1, semicolon_pos-space_pos);
+	buffer[semicolon_pos-space_pos] = '\0';
+
+	char *new_line_pos = strchr(buffer, '\n');
 	if (new_line_pos != NULL) {
 		printf("get_mime: New line detected - stripping it!\n");
 		*new_line_pos = '\0';
 	}
-	printf("get_mime: mime+type: %s\n", mime_type);
-	return mime_type;
+	printf("get_mime: mime+type: %s\n", buffer);
+}
+
+void  get_mime_by_ext(char* file_name, char *buffer, size_t buffer_size){
+	int file_name_size = strlen(file_name);
+
+	// v1
+	// int j=0;
+	// bool is_dot_in_path = false;
+	// for(int i=file_name_size - 1; i>=0; i--, j++) {
+	// 	if (file_name[i] == '.') {
+	// 		is_dot_in_path = true;
+	// 		break;
+	// 	} 
+	// 	if (file_name[i] == '/') break;
+
+	// 	buffer[j] = file_name[i];
+	// }
+	// buffer[j] = '\0';
+	// int buffer_length = strlen(buffer);
+	// for(int i=0; i<buffer_length/2; i++) {
+	// 	char temp = buffer[buffer_length - i - 1];
+	// 	buffer[buffer_length - i - 1] = buffer[i];
+	// 	buffer[i] = temp;
+	// }
+
+
+	// v2
+	bool is_dot_in_path = false;
+	int i=0;
+	for(i=file_name_size - 1; i>=0; i--) {
+		if (file_name[i] == '.') is_dot_in_path = true; 
+		if (file_name[i] == '.' || file_name[i] == '/') break; 
+	}
+
+	buffer[0] = '\0';
+	if (!is_dot_in_path) return;
+
+	char file_extension[64];
+	int j=0;
+	for(; j+i+1 < file_name_size; j++) 
+		file_extension[j] = file_name[j+i+1];
+	file_extension[j] = '\0';
+
+	if (strcmp(file_extension, "css") == 0) strcpy(buffer, "text/css");
+	else get_mime_file(file_name, buffer, buffer_size); 
+
+	printf("mime2: |%s|\n", buffer);
+
 }
 
 void download_response(char * buf, struct http_response* response) {
@@ -285,28 +340,28 @@ void download_response(char * buf, struct http_response* response) {
 			}
 			else {
 				if (errno == ENOTDIR ) {
-					char* mime_type = get_mime(path_buffer);
-					if (mime_type == NULL) k_string_set(&response->response_type, "application/octet-stream");
-					else k_string_set(&response->response_type, mime_type);
+					// char* mime_type = get_mime(path_buffer);
+					// if (mime_type == NULL) k_string_set(&response->response_type, "application/octet-stream");
+					// else k_string_set(&response->response_type, mime_type);
 
-					printf("NOT A DIRECTORY: |%s|\n", path_buffer);
-					FILE *fptr = fopen(path_buffer, "r");
-					if (fptr == NULL) {
-						perror("");
-						exit(1);
-					}
-					char ch[1];
-					k_string_set(&response->response_body, "");
-					int size = 0;
-					while (fread(ch, sizeof(char), 1, fptr) == 1) {
-						k_string_appendc(&response->response_body, ch[0]);
-						size++;
-					}
-					printf("\tsize of bin: %i\n", size);
+					// printf("NOT A DIRECTORY: |%s|\n", path_buffer);
+					// FILE *fptr = fopen(path_buffer, "r");
+					// if (fptr == NULL) {
+					// 	perror("");
+					// 	exit(1);
+					// }
+					// char ch[1];
+					// k_string_set(&response->response_body, "");
+					// int size = 0;
+					// while (fread(ch, sizeof(char), 1, fptr) == 1) {
+					// 	k_string_appendc(&response->response_body, ch[0]);
+					// 	size++;
+					// }
+					// printf("\tsize of bin: %i\n", size);
 
-					fclose(fptr);
+					// fclose(fptr);
 					
-					free(mime_type);
+					// free(mime_type);
 				}
 			}
 		} else {
@@ -374,13 +429,34 @@ void html_response(char * buf, struct http_response* response) {
 			// do stpcpy when size src is less than dest
 			// we need size of dest, 
 			if (dr) {
+				k_string_append(&response->response_body, "<ul>");
+				while((en = readdir(dr)) != NULL) {
+					if (strcmp(en->d_name, ".") == 0) continue;
+
+					char line[600];
+					char new_path[300];
+					if (path[strlen(path)-1] == '/') path[strlen(path) - 1] = '\0';
+					// if (strcmp(path, "/\0") == 0) snprintf(new_path, sizeof new_path, "/%s", en->d_name);
+					// else snprintf(new_path, sizeof new_path, "%s/%s", path, en->d_name);
+					snprintf(new_path, sizeof new_path, "%s/%s", path, en->d_name);
+
+					if (en->d_type == DT_REG) {
+						snprintf(line, sizeof line, "<li><a href=\"%s\">%s</a></li>", new_path, en->d_name);
+						k_string_append(&response->response_body, line);
+					} else if (en->d_type == DT_DIR) {
+						snprintf(line, sizeof line, "<li><a href=\"%s\">-> %s</a></li>", new_path, en->d_name);
+						k_string_append(&response->response_body, line);
+					}
+				}
+				k_string_append(&response->response_body, "</ul>");
 				closedir(dr);
 			}
 			else {
 				if (errno == ENOTDIR ) {
 					is_file = 1; 
-					char* mime_type = get_mime(path_buffer);
-					if (mime_type == NULL) k_string_set(&response->response_type, "application/octet-stream");
+					char mime_type[64];
+					get_mime_by_ext(path_buffer, mime_type, 64);
+					if (strlen(mime_type) == 0) k_string_set(&response->response_type, "application/octet-stream");
 					else k_string_set(&response->response_type, mime_type);
 
 					printf("NOT A DIRECTORY: |%s|\n", path_buffer);
@@ -399,9 +475,6 @@ void html_response(char * buf, struct http_response* response) {
 					printf("\tsize of bin: %i\n", size);
 
 					fclose(fptr);
-					
-					free(mime_type);
-
 				}
 			}
 		} else {
@@ -416,6 +489,7 @@ void html_response(char * buf, struct http_response* response) {
 
 void create_http_response(char * buf, struct http_response* response) {
 	html_response(buf, response);
+	// download_response(buf, response);
 }
 
 void make_response(struct http_response* response) {
