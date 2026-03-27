@@ -11,6 +11,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <stdbool.h>
+#include "global_vars.h"
 
 #define PORT "1313"
 
@@ -286,6 +287,7 @@ void write_file_to_response_body(char* path_buffer, struct http_response* respon
 
 }
 
+
 void html_response(char * buf, struct http_response* response) {
 	// snprintf(response->content_type, sizeof(response->content_type), "text/html");
 	k_string_set(&response->response_type, "text/html");
@@ -486,8 +488,11 @@ void download_response(char * buf, struct http_response* response) {
 }
 
 void create_http_response(char * buf, struct http_response* response) {
-	html_response(buf, response);
-	// download_response(buf, response);
+	if (GLOBALS._DOWNLOAD_FLAG) 
+		download_response(buf, response);
+	else 
+		html_response(buf, response);
+	
 }
 
 void make_response(struct http_response* response) {

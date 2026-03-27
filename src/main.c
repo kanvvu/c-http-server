@@ -1,10 +1,22 @@
 #include "utils.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include "global_vars.h"
 
-int main() {
+
+struct _GLOBALS GLOBALS = {0, 1313};
+
+int main(int argc, char **argv) {
+
+	if (argc > 1) {
+		if (strcmp("-d", argv[1]) == 0) {
+			GLOBALS._DOWNLOAD_FLAG = 1;
+		}
+	}
+
+	
 	int listener;
-
 	int fd_size = 5;
 	int fd_count = 0;
 	struct pollfd *pfds = malloc(sizeof *pfds * fd_size);
