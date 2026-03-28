@@ -10,9 +10,26 @@ struct _GLOBALS GLOBALS = {0, 1313};
 int main(int argc, char **argv) {
 
 	if (argc > 1) {
-		if (strcmp("-d", argv[1]) == 0) {
-			GLOBALS._DOWNLOAD_FLAG = 1;
+		for(int i=1; i<argc; i++) {
+			if (strcmp("-d", argv[i]) == 0) {
+				printf("DOWNLOAD flag provided!\n");
+				GLOBALS._DOWNLOAD_FLAG = 1;
+			} else if(strcmp("-p", argv[i]) == 0) {
+				if (argc <= i + 1) {
+					printf("You need to specify port number!\n");
+					exit(1);
+				} else {
+					int port = atoi(argv[i+1]);
+					GLOBALS.PORT = port;
+					printf("PORT PROVIDED!: %d\n", port);
+					i++;
+				}
+			} else {
+				printf("UNKOWN argument:'%s'\n", argv[i]);
+				exit(1);
+			}
 		}
+
 	}
 
 	
