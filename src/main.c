@@ -5,33 +5,46 @@
 #include "global_vars.h"
 
 
-struct _GLOBALS GLOBALS = {0, 1313};
+struct _GLOBALS GLOBALS = {0, "1313"};
 
-int main(int argc, char **argv) {
-
+void process_terminal_arguments(int argc, char **argv) {
 	if (argc > 1) {
 		for(int i=1; i<argc; i++) {
+			// download flag
 			if (strcmp("-d", argv[i]) == 0) {
 				printf("DOWNLOAD flag provided!\n");
 				GLOBALS._DOWNLOAD_FLAG = 1;
+			// port flag
 			} else if(strcmp("-p", argv[i]) == 0) {
 				if (argc <= i + 1) {
 					printf("You need to specify port number!\n");
 					exit(1);
-				} else {
-					int port = atoi(argv[i+1]);
-					GLOBALS.PORT = port;
-					printf("PORT PROVIDED!: %d\n", port);
-					i++;
 				}
+				if (strlen(argv[i+1] > 5)) {
+					printf("INVALID port number!\n");
+					exit(1);
+				}
+                for(int j=0; j<strlen(argv[i+1]); j++) {
+                    if (argv[i+1][j] < '0' || argv[i+1][j] > '9') {
+                        printf("INVALID port number! %s\n", argv[i+1]);
+                        exit(1);
+                    }
+                    GLOBALS.PORT[j] = argv[i+1][j];
+                }
+                GLOBALS.PORT[strlen(argv[i+1])] = '\0';
+                i++;
+			// unknown flag 
 			} else {
 				printf("UNKOWN argument:'%s'\n", argv[i]);
 				exit(1);
 			}
 		}
-
 	}
+}
 
+int main(int argc, char **argv) {
+
+	process_terminal_arguments(argc, argv);
 	
 	int listener;
 	int fd_size = 5;

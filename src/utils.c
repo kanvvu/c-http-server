@@ -13,7 +13,7 @@
 #include <stdbool.h>
 #include "global_vars.h"
 
-#define PORT "1313"
+// #define PORT "1313"
 
 int sent_msg(int fd, char * msg) {
 	int len, bytes_sent;
@@ -88,7 +88,7 @@ int get_listener_socket() {
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_flags = AI_PASSIVE;
 
-	if ((rv = getaddrinfo(NULL, PORT, &hints, &ai)) != 0) {
+	if ((rv = getaddrinfo(NULL, GLOBALS.PORT, &hints, &ai)) != 0) {
 		fprintf(stderr, "pollsever: %s\n", gai_strerror(rv));
 		exit(1);
 	}
@@ -355,8 +355,6 @@ void html_response(char * buf, struct http_response* response) {
 					char line[600];
 					char new_path[300];
 					if (path[strlen(path)-1] == '/') path[strlen(path) - 1] = '\0';
-					// if (strcmp(path, "/\0") == 0) snprintf(new_path, sizeof new_path, "/%s", en->d_name);
-					// else snprintf(new_path, sizeof new_path, "%s/%s", path, en->d_name);
 					snprintf(new_path, sizeof new_path, "%s/%s", path, en->d_name);
 
 					if (en->d_type == DT_REG) {
