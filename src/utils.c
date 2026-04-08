@@ -287,8 +287,7 @@ void write_file_to_response_body(char* path_buffer, struct http_response* respon
 
 }
 
-
-void html_response(char * buf, struct http_response* response) {
+void create_http_response(char * buf, struct http_response* response) {
 	// snprintf(response->content_type, sizeof(response->content_type), "text/html");
 	k_string_set(&response->response_type, "text/html");
 
@@ -347,7 +346,7 @@ void html_response(char * buf, struct http_response* response) {
 				while((en = readdir(dr)) != NULL) {
 					if (strcmp(en->d_name, ".") == 0) continue;
 
-					if (strcmp(en->d_name, "index.html") == 0) {
+					if (strcmp(en->d_name, "index.html") == 0 && GLOBALS._DOWNLOAD_FLAG == 0) {
 						is_index_html_in_dir = true;
 						break;
 					}
@@ -358,7 +357,11 @@ void html_response(char * buf, struct http_response* response) {
 					snprintf(new_path, sizeof new_path, "%s/%s", path, en->d_name);
 
 					if (en->d_type == DT_REG) {
-						snprintf(line, sizeof line, "<li><a href=\"%s\">%s</a></li>", new_path, en->d_name);
+						if (GLOBALS._DOWNLOAD_FLAG)
+							snprintf(line, sizeof line, "<li><a href=\"%s\" download>%s</a></li>", new_path, en->d_name);
+						else
+							snprintf(line, sizeof line, "<li><a href=\"%s\">%s</a></li>", new_path, en->d_name);
+
 						k_string_append(&response->response_body, line);
 					} else if (en->d_type == DT_DIR) {
 						snprintf(line, sizeof line, "<li><a href=\"%s\">-> %s</a></li>", new_path, en->d_name);
@@ -372,7 +375,7 @@ void html_response(char * buf, struct http_response* response) {
 					char buffer[1300];
 					snprintf(buffer, sizeof buffer, "%s/index.html", path_buffer);
 					write_file_to_response_body(buffer, response);
-				} else {
+				} else if (GLOBALS._DOWNLOAD_FLAG) {
 					printf("There is NO index.html in directory!\n");
 				}
 
@@ -391,105 +394,6 @@ void html_response(char * buf, struct http_response* response) {
 		
 	} 
 	make_response(response);
-}
-
-
-void download_response(char * buf, struct http_response* response) {
-	// snprintf(response->content_type, sizeof(response->content_type), "text/html");
-	k_string_set(&response->response_type, "text/html");
-
-
-	/*
-	1. Get first line of request
-	*/
-	char *first_space = strchr(buf, ' ');
-	if (first_space == NULL) {
-		make_internal_server_error(response);
-		return;
-	}
-	char *second_space = strchr(first_space+1, ' ');
-	if (second_space == NULL) {
-		make_internal_server_error(response);
-		return;
-	}
-	/*
-	2. Check first argument, if GET proceed
-	*/
-	if (strncmp(buf, "GET", 3) == 0) {
-		char *path = strndup(first_space+1, second_space-first_space);
-		path[second_space-first_space-1] = '\0';
-
-		printf("VERI GOOOD!!!! |%s|\n", path);
-
-		char path_buffer[1024];
-		if (strcmp(path, "/") == 0) snprintf(path_buffer, sizeof(path_buffer), "."); 
-		else {
-			snprintf(path_buffer, sizeof(path_buffer), ".%s", path);
-		}
-
-
-		/*
-		3. Check if path exists
-		*/
-		if (access(path_buffer, R_OK) == 0) {
-			/*
-			4. If exists print contnents
-			*/
-			printf("path %s exists!\n", path_buffer);
-			// snprintf(response->response_code, sizeof response->response_code, "200 OK");
-			k_string_set(&response->response_code, "200 OK");
-			
-			
-
-			DIR *dr;
-			struct dirent *en;
-			dr = opendir(path_buffer);
-
-			// do stpcpy when size src is less than dest
-			// we need size of dest, 
-			if (dr) {
-				k_string_append(&response->response_body, "<ul>");
-				while((en = readdir(dr)) != NULL) {
-					if (strcmp(en->d_name, ".") == 0) continue;
-
-					char line[600];
-					char new_path[300];
-					if (path[strlen(path)-1] == '/') path[strlen(path) - 1] = '\0';
-					// if (strcmp(path, "/\0") == 0) snprintf(new_path, sizeof new_path, "/%s", en->d_name);
-					// else snprintf(new_path, sizeof new_path, "%s/%s", path, en->d_name);
-					snprintf(new_path, sizeof new_path, "%s/%s", path, en->d_name);
-
-					if (en->d_type == DT_REG) {
-						snprintf(line, sizeof line, "<li><a href=\"%s\" download>%s</a></li>", new_path, en->d_name);
-						k_string_append(&response->response_body, line);
-					} else if (en->d_type == DT_DIR) {
-						snprintf(line, sizeof line, "<li><a href=\"%s\">-> %s</a></li>", new_path, en->d_name);
-						k_string_append(&response->response_body, line);
-					}
-				}
-				k_string_append(&response->response_body, "</ul>");
-				closedir(dr);
-			}
-			else {
-				if (errno == ENOTDIR ) {
-					write_file_to_response_body(path_buffer, response);
-				}
-			}
-		} else {
-			printf("path %s does not exist!\n", path_buffer);
-			k_string_set(&response->response_code, "404 Not Found");
-		}
-		free(path);
-		
-	} 
-	make_response(response);
-}
-
-void create_http_response(char * buf, struct http_response* response) {
-	if (GLOBALS._DOWNLOAD_FLAG) 
-		download_response(buf, response);
-	else 
-		html_response(buf, response);
 	
 }
 

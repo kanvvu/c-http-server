@@ -20,7 +20,7 @@ void process_terminal_arguments(int argc, char **argv) {
 					printf("You need to specify port number!\n");
 					exit(1);
 				}
-				if (strlen(argv[i+1] > 5)) {
+				if (strlen(argv[i+1]) > 5) {
 					printf("INVALID port number!\n");
 					exit(1);
 				}
