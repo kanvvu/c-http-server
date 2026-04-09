@@ -287,6 +287,55 @@ void write_file_to_response_body(char* path_buffer, struct http_response* respon
 
 }
 
+void add_style(struct http_response* response) {
+	k_string_append(&response->response_body, 
+	"<head>\n"
+	"   <meta charset=\"UTF-8\">\n" 
+	"   <style>\n"
+	"       body {\n"
+	"           background-color: #f4f4f9;\n"
+	"           font-family: sans-serif;\n" 
+	"       }\n"
+	"       .center {\n"
+	"           display: flex;\n"
+	"           justify-content: center;\n"
+	"           padding-top: 5px;\n"
+	"       }\n" 
+	"       ul {\n"
+	"           list-style-type: none;\n"
+	"           padding: 0;\n"
+	"           width: 80%;\n" 
+	"           max-width: 800px;\n"
+	"           border: 1px solid #ccc;\n" 
+	"           border-radius: 8px;\n" 
+	"           overflow: hidden;\n" 
+	"           box-shadow: 0 4px 6px rgba(0,0,0,0.1);\n" 
+	"       }\n"
+	"       li {\n"
+	"           padding: 12px 15px;\n"
+	"           border-bottom: 1px solid #ddd;\n" 
+	"       }\n"
+	"       li:last-child {\n"
+	"           border-bottom: none;\n" 
+	"       }\n"
+	"       li:nth-child(odd) {\n"
+	"           background-color: #ffffff;\n" 
+	"       }\n"
+	"       li:nth-child(even) {\n"
+	"           background-color: #f9f9f9;\n" 
+	"       }\n"
+	"       li:hover {\n"
+	"           background-color: #e2e8f0;\n"
+	"       }\n"
+	"       a {\n"
+	"           text-decoration: none;\n"
+	"           color: #333;\n"
+	"           display: block;\n" 
+	"       }\n"
+	"   </style>\n"
+	"</head>\n");
+}
+
 void create_http_response(char * buf, struct http_response* response) {
 	// snprintf(response->content_type, sizeof(response->content_type), "text/html");
 	k_string_set(&response->response_type, "text/html");
@@ -341,8 +390,11 @@ void create_http_response(char * buf, struct http_response* response) {
 			// do stpcpy when size src is less than dest
 			// we need size of dest, 
 			if (dr) {
+
+				add_style(response);
+
 				bool is_index_html_in_dir = false;
-				k_string_append(&response->response_body, "<ul>");
+				k_string_append(&response->response_body, "<div class=\"center\"><ul>\n");
 				while((en = readdir(dr)) != NULL) {
 					if (strcmp(en->d_name, ".") == 0) continue;
 
@@ -358,17 +410,17 @@ void create_http_response(char * buf, struct http_response* response) {
 
 					if (en->d_type == DT_REG) {
 						if (GLOBALS._DOWNLOAD_FLAG)
-							snprintf(line, sizeof line, "<li><a href=\"%s\" download>%s</a></li>", new_path, en->d_name);
+							snprintf(line, sizeof line, "\t<li><a href=\"%s\" download>📄 %s</a></li>\n", new_path, en->d_name);
 						else
-							snprintf(line, sizeof line, "<li><a href=\"%s\">%s</a></li>", new_path, en->d_name);
+							snprintf(line, sizeof line, "\t<li><a href=\"%s\">📄 %s</a></li>\n", new_path, en->d_name);
 
 						k_string_append(&response->response_body, line);
 					} else if (en->d_type == DT_DIR) {
-						snprintf(line, sizeof line, "<li><a href=\"%s\">-> %s</a></li>", new_path, en->d_name);
+						snprintf(line, sizeof line, "\t<li><a href=\"%s\">📁 %s</a></li>\n", new_path, en->d_name);
 						k_string_append(&response->response_body, line);
 					}
 				}
-				k_string_append(&response->response_body, "</ul>");
+				k_string_append(&response->response_body, "</ul></div>");
 				
 				if (is_index_html_in_dir) {
 					printf("There IS index.html in directory!\n");
