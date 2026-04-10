@@ -63,11 +63,11 @@ int main(int argc, char **argv) {
 
 	fd_count = 1;
 
-	puts("pollsever: waiting for connections... ");
+	puts("waiting for connections... ");
 
 	for(;;) {
 		int poll_count = poll(pfds, fd_count, -1);
-		printf("polled: %d\n", poll_count);
+		//printf("polled: %d\n", poll_count);
 
 		if (poll_count == -1) {
 			perror("poll");

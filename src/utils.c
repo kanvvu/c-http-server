@@ -45,7 +45,7 @@ int recv_msg(int fd) {
 
 	printf("\tBytes recived %d\n", bytes_recived);
 	buff[strcspn(buff, "\n")] = '\0';
-	printf("MSG: %s\n", buff);
+	//printf("MSG: %s\n", buff);
 
 	return 0;
 }
@@ -259,7 +259,7 @@ void  get_mime_by_ext(char* file_name, char *buffer, size_t buffer_size){
 	if (strcmp(file_extension, "css") == 0) strcpy(buffer, "text/css");
 	else get_mime_file(file_name, buffer, buffer_size); 
 
-	printf("mime2: |%s|\n", buffer);
+	//printf("mime2: |%s|\n", buffer);
 
 }
 
@@ -269,7 +269,7 @@ void write_file_to_response_body(char* path_buffer, struct http_response* respon
 	if (strlen(mime_type) == 0) k_string_set(&response->response_type, "application/octet-stream");
 	else k_string_set(&response->response_type, mime_type);
 
-	printf("NOT A DIRECTORY: |%s|\n", path_buffer);
+	//printf("NOT A DIRECTORY: |%s|\n", path_buffer);
 	FILE *fptr = fopen(path_buffer, "r");
 	if (fptr == NULL) {
 		perror("");
@@ -282,7 +282,7 @@ void write_file_to_response_body(char* path_buffer, struct http_response* respon
 		k_string_appendc(&response->response_body, ch[0]);
 		size++;
 	}
-	printf("\tsize of bin: %i\n", size);
+	//printf("\tsize of bin: %i\n", size);
 	fclose(fptr);
 
 }
@@ -361,7 +361,7 @@ void create_http_response(char * buf, struct http_response* response) {
 		char *path = strndup(first_space+1, second_space-first_space);
 		path[second_space-first_space-1] = '\0';
 
-		printf("VERI GOOOD!!!! |%s|\n", path);
+		//printf("VERI GOOOD!!!! |%s|\n", path);
 
 		char path_buffer[1024];
 		if (strcmp(path, "/") == 0) snprintf(path_buffer, sizeof(path_buffer), "."); 
