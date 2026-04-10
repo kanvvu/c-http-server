@@ -474,8 +474,7 @@ void make_internal_server_error(struct http_response* response) {
 	k_string_set(&response->response, "HTTP/1.1 500 Internal Server Error");
 	k_string_append(&response->response, "\r\n");
 
-	k_string_append(&response->response, "Content-Type: ");
-	k_string_append(&response->response, "text/html");
+	k_string_append(&response->response, "Content-Type: text/html");
 	k_string_append(&response->response, "\r\n");
 
 	k_string_append(&response->response, "Content-Length: 0");
